@@ -1,0 +1,215 @@
+---
+title       : BRFSS Small Area Estimates
+subtitle    : 
+author      : Morgan Robinson 
+job         : Data Analyst, PolicyMap
+logo        : 
+framework   : io2012        # {io2012, html5slides, shower, dzslides, ...}
+highlighter : highlight.js  # {highlight.js, prettify, highlight}
+hitheme     : tomorrow      # 
+url:
+  lib: ../../libraries
+  assets: ../../assets
+widgets     : [mathjax]            # {mathjax, quiz, bootstrap}
+mode        : draft # {standalone, selfcontained}
+---
+  
+
+This document contains the methodology and R code necessary to process the small area estimates for Health Status in 2013. 
+
+Would you say that in general your health is: 
+  * Excellent, Very good: GEN_VGEXCL
+
+## Load required libraries/connections
+```{r loadlibraries}
+setwd("C:/Users/robinsonm/Documents/BRFSS-small-area-estimates")
+library("RODBC")
+library("ggplot2")
+library("arm")
+
+```
+
+to do: load data, sample, then export to csv; 
+save csv in github assets; 
+comment out and remove actual paths.
+
+
+
+1. BRFSS data structure
+  a. predictor and response variables
+2. ACS data structure
+3. Exploratory Analysis and modeling
+4. Predictive Results
+5. Aggregating results (counties)
+6. Map results
+
+
+## Load the data
+SQL connection reads the following data tables:
+* Full record set of survey data, coded according to BRFSS 2013 manual {link here}
+* State-level survey data, weighted with provided values
+* Shell/matrix of population of state/metro status/race/age/income classifications, based on 2009 - 2013 ACS and 2009 metropolitan classification (principal city/outlying county/rural)
+```{r demo2013, cache=TRUE}
+rm(con)
+rm(data)
+rm(statedata)
+rm(geo_shell)
+
+con <- odbcDriverConnect('driver={SQL Server};server=gis;database=CDC_BRFSS_PolicyMap;trusted_connection=true')
+geo_shell <- sqlQuery(
+  con, paste('SELECT * FROM dbo.geo_shell') , errors = TRUE) 
+
+data <- sqlQuery(con, paste('select * from dbo.indicators_2013_cats_for_mrp'), errors = TRUE, max = 0)
+
+statedata <- sqlQuery(con, paste('select * from dbo.inds_by_state_2013'), errors = TRUE)
+
+close(con)
+
+```
+
+##Correct formatting
+We need to fix the FIPS codes that were read-in as integers (look into specifying as.is for individual columns)
+``` {r FIPS formatting}
+data$FIPS <- factor(formatC(data$FIPS, width=2, flag="0"))
+statedata$FIPS <- formatC(statedata$FIPS, width=2, flag="0")
+geo_shell$FIPS <- factor(formatC(geo_shell$FIPS, width=2, flag="0"))
+
+```
+
+##Analyze the state data
+We select a subset of the value calculations for the state data, and look for correlations among demographic, other possible predictive variables, and the set of predicted variables. Note that indicators on a different scale of magnitude may disproportionately correlate, as compared to their peer indicators with a similar variance.
+```{r matrix by state, cache=TRUE}
+
+stcols <- c("MSCODE", "AVG_AGE_G", "AVG_INCOME_SCALE",  "AVG_HISPANC2", "AVG_WHITE", "AVG_BLACK", "AVG_OTHER",  "AVG_MULTI", "AVG_GENHLTH", "AVG_GEN_VGEXCL", "AVG_GEN_FRPOOR", "AVG_PHYSHLTH7P", "AVG_MENTHLTH7P")
+gh_statedata <-  statedata[,names(statedata) %in% stcols]
+
+statecormat <- cor(gh_statedata, y = NULL, use = "everything")
+corrplot(statecormat, details = TRUE, abs = TRUE)
+
+
+```
+
+##Merge the record-level survey with the state values
+In this section we tag the record-level survey with the state indicators. This borrows strength from the weighted state data. We use the state FIPS code to join the data and create new fields in the record-level dataset.
+``` {r datamerge, cache = TRUE}
+
+data$ST_MSSTATUS <- statedata$MSCODE[data$FIPS]# wt. average metro code among tracts in state
+data$ST_AVG_AGE <- statedata$AVG_AGE_G[data$FIPS]# wt. average age group among tracts in state
+data$ST_AVG_INC <- statedata$AVG_INCOME_SCALE[data$FIPS]# wt. average age group among tracts in state
+data$ST_PCT_HISP <- statedata$AVG_HISPANC2[data$FIPS]# wt. pct of survey respondents in state who are hispanic
+data$ST_PCT_BLK <- statedata$AVG_BLACK[data$FIPS]# wt. pct of survey respondents in state who are black
+data$ST_PCT_WHITE <- statedata$AVG_WHITE[data$FIPS]  
+data$ST_PCT_OTHER <- statedata$AVG_OTHER[data$FIPS]
+data$ST_PCT_MULTI <- statedata$AVG_MULTI[data$FIPS] 
+data$ST_GENHLTH <- statedata$AVG_GENHLTH[data$FIPS]# wt. average general health scale
+data$ST_GEN_VGEXCL <- statedata$AVG_GEN_VGEXCL[data$FIPS]
+data$ST_GEN_FRPOOR <- statedata$AVG_GEN_FRPOOR[data$FIPS]
+data$ST_PHYSHLTH7P <- statedata$AVG_PHYSHLTH7P[data$FIPS]
+data$ST_MENTHLTH7P <- statedata$AVG_MENTHLTH7P[data$FIPS]
+
+```
+
+##Prep the survey data for modeling
+We take a robust sample of the survey data - due to memory/processing constraints, a full analysis is not possible. 40k records represents roughly 750 records per state, and should cover a meaningful number of the 640 combinations of race/age/income/metro status across all states. 
+
+Survey weights are used in this sample to avoid bias.
+
+##Isolate predicted and predictor variables
+Select the response variable to predict, and all possible predictors. Use complete.cases to exclude all NA values from the sample.
+``` {r variable selection}
+gh_rdata <- data[sample(1:nrow(data), size=5000, replace=F, prob = as.integer(data$LLCPWT)), ]
+
+
+ghcols <- c("STATE", "LLCPWT", "MSLABEL", "MSLABEL", "INCOME", "INCOMELABEL", "AGE_GLABEL", "AGE_G", "RACELABEL", "GEN_VGEXCL", "ST_GEN_VGEXCL", "ST_MSSTATUS", "ST_AVG_AGE", "ST_AVG_INC", "ST_PCT_HISP", "ST_PCT_BLACK", "ST_PCT_WHITE", "ST_PCT_OTHER", "ST_PCT_MULTI", "ST_GENHLTH")
+gh_rdata <-  datareduce[,names(datareduce) %in% ghcols]
+
+gh_rdata <- gh_rdata[complete.cases(gh_rdata), ]
+gh_rdata$INCOMELABEL <- relevel(gh_rdata$INCOMELABEL, "I8")
+gh_rdata$RACELABEL <- relevel(gh_rdata$RACELABEL, "RWH")
+
+write.table(cbind(gh_rdata, deparse.level = 1),
+                  "gh_rdata.txt",quote=TRUE,sep=",",col.names=TRUE,row.names=FALSE, na = "", append=FALSE) #sample data output table
+
+
+```
+
+## fit some models - GEN_VGEXCL
+``` {r linear model, cache=TRUE}
+
+# ggplot(gh_rdata, aes(x=GENHLTH, y=AGE_G | RACELABEL + INCOMELABEL, size=population)
+
+
+gh_glm0 <- glmer(GEN_VGEXCL ~  RACELABEL + INCOMELABEL + AGE_GLABEL + ST_GEN_VGEXCL + (1| MSLABEL:RACELABEL), family = "binomial", data = gh_rdata)
+
+predictsample$PR_GEN_VGEXCL1 <- predict(
+  gh_glm0, type = "response", newdata = predictsample, allow.new.levels = TRUE)
+summary(predictsample$PR_GEN_VGEXCL1)
+summary(predictsample$GEN_VGEXCL)
+summary(predictsample$ST_GEN_VGEXCL)
+
+xyplot(PR_GEN_VGEXCL1~ AGE_G | STATE, data = predictsample)
+
+binnedplot(fitted(gh_glm0, type = "response"), resid(gh_glm0, type = "response"))
+
+```
+
+
+``` {r predict gen. hlth excellent small areas}
+gh_prediction <- geo_shell
+
+gh_prediction$MSLABEL <- formatC(gh_prediction$MSCODE, width = "1")
+gh_prediction$MSLABEL[gh_prediction$MSLABEL == "1"] <- "RA"
+gh_prediction$MSLABEL[gh_prediction$MSLABEL == "2"] <- "SC"
+gh_prediction$MSLABEL[gh_prediction$MSLABEL == "3"] <- "CC"
+gh_prediction$MSLABEL[gh_prediction$MSLABEL == "4"] <- "IC"
+
+gh_prediction$MSLABEL <- factor(gh_prediction$MSLABEL)
+gh_prediction$MSCODE <- factor(gh_prediction$MSCODE)
+
+gh_prediction$AGE[gh_prediction$AGE == "1"] <- "A1"
+gh_prediction$AGE[gh_prediction$AGE == "2"] <- "A2"
+gh_prediction$AGE[gh_prediction$AGE == "3"] <- "A3"
+gh_prediction$AGE[gh_prediction$AGE == "4"] <- "A4"
+gh_prediction$AGE_GLABEL <- factor(gh_prediction$AGE)
+gh_prediction$RACELABEL <- factor(gh_prediction$RACE)
+
+gh_prediction$INCOME[gh_prediction$INCOME == "1"] <- "I1"
+gh_prediction$INCOME[gh_prediction$INCOME == "2"] <- "I2"
+gh_prediction$INCOME[gh_prediction$INCOME == "3"] <- "I3"
+gh_prediction$INCOME[gh_prediction$INCOME == "4"] <- "I4"
+gh_prediction$INCOME[gh_prediction$INCOME == "5"] <- "I5"
+gh_prediction$INCOME[gh_prediction$INCOME == "6"] <- "I6"
+gh_prediction$INCOME[gh_prediction$INCOME == "7"] <- "I7"
+gh_prediction$INCOME[gh_prediction$INCOME == "8"] <- "I8"
+
+gh_prediction$INCOMELABEL <- factor(gh_prediction$INCOME)
+
+gh_prediction$STATE <- factor(statedata$STATE[gh_prediction$FIPS])
+
+gh_prediction$ST_PHYSHLTH7P <- statedata$AVG_PHYSHLTH7P[gh_prediction$FIPS]
+gh_prediction$ST_MENTHLTH7P <- statedata$AVG_MENTHLTH7P[gh_prediction$FIPS]
+gh_prediction$ST_GEN_FRPOOR <- statedata$AVG_GEN_FRPOOR[gh_prediction$FIPS]
+gh_prediction$ST_GEN_VGEXCL <- statedata$AVG_GEN_VGEXCL[gh_prediction$FIPS]
+gh_prediction$ST_GENHLTH <- statedata$AVG_GENHLTH[gh_prediction$FIPS]
+
+```
+
+```{r chunk, cache=TRUE}
+#add predicted values:
+for (i in seq_len(nrow(gh_prediction)))
+  {
+ gh_prediction$PR_GEN_VGEXCL[i] <- predict(
+   gh_glm0, type = "response", newdata = gh_prediction[i,], allow.new.levels = TRUE)
+  }
+
+xyplot(gh_prediction$PR_GEN_VGEXCL ~ gh_prediction$ST_GEN_VGEXCL)
+
+```
+
+
+``` {r exporting}
+
+write.table(cbind(gh_prediction, deparse.level = 1),
+                  "routput_est_genhealth20150401.txt",quote=TRUE,sep=",",col.names=TRUE,row.names=FALSE, na = "", append=FALSE) #output table
+
+```
