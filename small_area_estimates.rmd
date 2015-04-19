@@ -50,34 +50,37 @@ SQL connection reads the following data tables:
 * State-level survey data, weighted with provided values
 * Shell/matrix of population of state/metro status/race/age/income classifications, based on 2009 - 2013 ACS and 2009 metropolitan classification (principal city/outlying county/rural)
 ```{r demo2013, cache=TRUE}
-rm(con)
-rm(data)
-rm(statedata)
-rm(geo_shell)
+# rm(con)
+# rm(data)
+# rm(statedata)
+# rm(geo_shell)
+# 
+# con <- odbcDriverConnect('driver={SQL Server};server=gis;database=CDC_BRFSS_PolicyMap;trusted_connection=true')
+# geo_shell <- sqlQuery(
+#   con, paste('SELECT * FROM dbo.geo_shell') , errors = TRUE) 
+# 
+# data <- sqlQuery(con, paste('select * from dbo.indicators_2013_cats_for_mrp'), errors = TRUE, max = 0)
+# 
+# statedata <- sqlQuery(con, paste('select * from dbo.inds_by_state_2013'), errors = TRUE)
+# 
+# data$FIPS <- factor(formatC(data$FIPS, width=2, flag="0"))
+# statedata$FIPS <- formatC(statedata$FIPS, width=2, flag="0")
+# geo_shell$FIPS <- factor(formatC(geo_shell$FIPS, width=2, flag="0"))
+# 
+# gh_rdata <- data[sample(1:nrow(data), size=5000, replace=F, prob = as.integer(data$LLCPWT)), ]
 
-con <- odbcDriverConnect('driver={SQL Server};server=gis;database=CDC_BRFSS_PolicyMap;trusted_connection=true')
-geo_shell <- sqlQuery(
-  con, paste('SELECT * FROM dbo.geo_shell') , errors = TRUE) 
+data <- read.table("gh_rdata.txt", header=TRUE, quote="\"", sep=",", dec = ".", stringsAsFactors=F) #saved input table
 
-data <- sqlQuery(con, paste('select * from dbo.indicators_2013_cats_for_mrp'), errors = TRUE, max = 0)
-
-statedata <- sqlQuery(con, paste('select * from dbo.inds_by_state_2013'), errors = TRUE)
-
-close(con)
+#statedata <- # make .txt
+#geo_shell <- make .txt for some states
 
 ```
 
-##Correct formatting
-We need to fix the FIPS codes that were read-in as integers (look into specifying as.is for individual columns)
-``` {r FIPS formatting}
-data$FIPS <- factor(formatC(data$FIPS, width=2, flag="0"))
-statedata$FIPS <- formatC(statedata$FIPS, width=2, flag="0")
-geo_shell$FIPS <- factor(formatC(geo_shell$FIPS, width=2, flag="0"))
+##Analyze the state and record level data
+Good visualizations for this:
+frequency
 
-```
 
-##Analyze the state data
-We select a subset of the value calculations for the state data, and look for correlations among demographic, other possible predictive variables, and the set of predicted variables. Note that indicators on a different scale of magnitude may disproportionately correlate, as compared to their peer indicators with a similar variance.
 ```{r matrix by state, cache=TRUE}
 
 stcols <- c("MSCODE", "AVG_AGE_G", "AVG_INCOME_SCALE",  "AVG_HISPANC2", "AVG_WHITE", "AVG_BLACK", "AVG_OTHER",  "AVG_MULTI", "AVG_GENHLTH", "AVG_GEN_VGEXCL", "AVG_GEN_FRPOOR", "AVG_PHYSHLTH7P", "AVG_MENTHLTH7P")
@@ -117,7 +120,7 @@ Survey weights are used in this sample to avoid bias.
 ##Isolate predicted and predictor variables
 Select the response variable to predict, and all possible predictors. Use complete.cases to exclude all NA values from the sample.
 ``` {r variable selection}
-gh_rdata <- data[sample(1:nrow(data), size=5000, replace=F, prob = as.integer(data$LLCPWT)), ]
+
 
 
 ghcols <- c("STATE", "LLCPWT", "MSLABEL", "MSLABEL", "INCOME", "INCOMELABEL", "AGE_GLABEL", "AGE_G", "RACELABEL", "GEN_VGEXCL", "ST_GEN_VGEXCL", "ST_MSSTATUS", "ST_AVG_AGE", "ST_AVG_INC", "ST_PCT_HISP", "ST_PCT_BLACK", "ST_PCT_WHITE", "ST_PCT_OTHER", "ST_PCT_MULTI", "ST_GENHLTH")
@@ -196,20 +199,22 @@ gh_prediction$ST_GENHLTH <- statedata$AVG_GENHLTH[gh_prediction$FIPS]
 
 ```{r chunk, cache=TRUE}
 #add predicted values:
-for (i in seq_len(nrow(gh_prediction)))
-  {
- gh_prediction$PR_GEN_VGEXCL[i] <- predict(
-   gh_glm0, type = "response", newdata = gh_prediction[i,], allow.new.levels = TRUE)
-  }
 
-xyplot(gh_prediction$PR_GEN_VGEXCL ~ gh_prediction$ST_GEN_VGEXCL)
+
+ geo_shell$PR_GEN_VGEXCL <- predict(
+   gh_glm0, type = "response", newdata = gh_prediction, allow.new.levels = TRUE)
+
+
+#plot state results against predicted values
+xyplot(geo_shell$PR_GEN_VGEXCL ~ geo_shell$ST_GEN_VGEXCL)
+#bwplot by state
+
 
 ```
 
 
-``` {r exporting}
+``` {r map}
 
-write.table(cbind(gh_prediction, deparse.level = 1),
-                  "routput_est_genhealth20150401.txt",quote=TRUE,sep=",",col.names=TRUE,row.names=FALSE, na = "", append=FALSE) #output table
+## county map with ggplot2
 
 ```
