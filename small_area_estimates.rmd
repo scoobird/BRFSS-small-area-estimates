@@ -97,9 +97,9 @@ frequency
 ```{r matrix by state}
 #statedata <- # make .txt
 
-stcols <- c("AVG_GEN_VGEXCL", "MSCODE", "AVG_AGE_G", "AVG_INCOME_SCALE",  "AVG_BLACK", "STATE")
+stcols <- c("AVG_GEN_VGEXCL", "MSCODE", "AVG_AGE_G", "AVG_INCOME_SCALE", "STATE")
 gh_statedata <-  statedata[,names(statedata) %in% stcols]
-pairs(gh_statedata[, c(6, 2, 5, 7)])
+pairs(gh_statedata)
 
 ```
 
@@ -109,6 +109,7 @@ This allows us to use the weighted state values as predictor variables.
 We use the state FIPS code to join the data and create new fields in the record-level dataset.
 ``` {r datamerge, tidy=TRUE}
 
+data$FIPS <- factor(data$FIPS)
 data$ST_MSSTATUS <- statedata$MSCODE[data$FIPS]# wt. average metro code among tracts in state
 data$ST_AVG_AGE <- statedata$AVG_AGE_G[data$FIPS]# wt. average age group among tracts in state
 data$ST_AVG_INC <- statedata$AVG_INCOME_SCALE[data$FIPS]# wt. average age group among tracts in state
@@ -121,6 +122,8 @@ data$ST_GENHLTH <- statedata$AVG_GENHLTH[data$FIPS]# wt. average general health 
 data$ST_GEN_VGEXCL <- statedata$AVG_GEN_VGEXCL[data$FIPS]
 data$ST_GEN_FRPOOR <- statedata$AVG_GEN_FRPOOR[data$FIPS]
 
+
+statedata$FIPS <- factor(statedata$FIPS)
 ```
 
 ##Prep the survey data for modeling
@@ -129,17 +132,20 @@ data$ST_GEN_FRPOOR <- statedata$AVG_GEN_FRPOOR[data$FIPS]
 ##Isolate predicted and predictor variables
 Select the response variable to predict, and all possible predictors. Use complete.cases to exclude all NA values from the sample.
 ``` {r variable selection}
-ghcols <- c("STATE", "LLCPWT", "MSLABEL", "MSLABEL", "INCOME", "INCOMELABEL", "AGE_GLABEL", "AGE_G", "RACELABEL", "GEN_VGEXCL", "ST_GEN_VGEXCL")
-gh_rdata <-  datareduce[,names(datareduce) %in% ghcols]
+ghcols <- c("FIPS", "STATE", "LLCPWT", "MSLABEL", "INCOMELABEL", "AGE_GLABEL", "RACELABEL", "GEN_VGEXCL", "ST_GEN_VGEXCL")
+data <-  data[,names(data) %in% ghcols]
+head(data)
+data <- data[complete.cases(data), ]
+head(data)
 
-gh_rdata <- gh_rdata[complete.cases(gh_rdata), ]
-gh_rdata$INCOMELABEL <- relevel(gh_rdata$INCOMELABEL, "I8")
-gh_rdata$RACELABEL <- relevel(gh_rdata$RACELABEL, "RWH")
+levels(data$INCOMELABEL)
+levels(data$RACELABEL)
 
-write.table(cbind(gh_rdata, deparse.level = 1),
-                  "gh_rdata.txt",quote=TRUE,sep=",",col.names=TRUE,row.names=FALSE, na = "", append=FALSE) #sample data output table
+data$INCOMELABEL <- relevel(data$INCOMELABEL, "I8")
+data$RACELABEL <- relevel(data$RACELABEL, "RWH")
 
-
+levels(data$INCOMELABEL)
+levels(data$RACELABEL)
 ```
 
 ##Exploratory modeling
@@ -153,20 +159,25 @@ Use a generalized linear model to identify variables for modeling
 
 # ggplot(gh_rdata, aes(x=GENHLTH, y=AGE_G | RACELABEL + INCOMELABEL, size=population)
 
-
-gh_glm <- glmer(GEN_VGEXCL ~  RACELABEL + INCOMELABEL + AGE_GLABEL + ST_GEN_VGEXCL + (1| MSLABEL:RACELABEL), family = "binomial", data = gh_rdata)
+glm <- glmer(GEN_VGEXCL ~  RACELABEL + INCOMELABEL + AGE_GLABEL + ST_GEN_VGEXCL + (1| MSLABEL:RACELABEL), family = "binomial", data = data)
 
 predictsample <- data[sample(1:nrow(data), size=5000, replace=T, prob = as.integer(data$LLCPWT)), ]
 
-predictsample$PR_GEN_VGEXCL1 <- predict(
-  gh_glm, type = "response", newdata = predictsample, allow.new.levels = TRUE)
-summary(predictsample$PR_GEN_VGEXCL1)
+predictsample$PR_GEN_VGEXCL <- predict(
+  glm, type = "response", newdata = predictsample, allow.new.levels = TRUE)
+summary(predictsample$PR_GEN_VGEXCL)
 summary(predictsample$GEN_VGEXCL)
 summary(predictsample$ST_GEN_VGEXCL)
 
-xyplot(PR_GEN_VGEXCL1~ AGE_G | STATE, data = predictsample)
+#xyplot(PR_GEN_VGEXCL1~ AGE_GLABEL | STATE, data = predictsample)
+ggplot(predictsample, aes(x=INCOMELABEL, y=PR_GEN_VGEXCL1)) +
+    geom_point(shape=1)
 
+```
 
+```{r prediction}
+geo_shell[0:10, ]
+summary(geo_shell)
 ```
 
 
@@ -176,6 +187,8 @@ geo_shell$MSLABEL[geo_shell$MSLABEL == "1"] <- "RA"
 geo_shell$MSLABEL[geo_shell$MSLABEL == "2"] <- "SC"
 geo_shell$MSLABEL[geo_shell$MSLABEL == "3"] <- "CC"
 geo_shell$MSLABEL[geo_shell$MSLABEL == "4"] <- "IC"
+
+geo_shell$FIPS <- factor(geo_shell$FIPS)
 
 geo_shell$MSLABEL <- factor(geo_shell$MSLABEL)
 geo_shell$MSCODE <- factor(geo_shell$MSCODE)
@@ -196,21 +209,25 @@ geo_shell$INCOME[geo_shell$INCOME == "6"] <- "I6"
 geo_shell$INCOME[geo_shell$INCOME == "7"] <- "I7"
 geo_shell$INCOME[geo_shell$INCOME == "8"] <- "I8"
 geo_shell$INCOMELABEL <- factor(geo_shell$INCOME)
-geo_shell$STATE <- factor(statedata$STATE[geo_shell$FIPS])
+geo_shell$STATE <- statedata$STATE[geo_shell$FIPS]
 
 
 ```
 
 ```{r}
 geo_shell$ST_GEN_VGEXCL <- statedata$AVG_GEN_VGEXCL[geo_shell$FIPS]
-#add predicted values:
 
+head(geo_shell[, c(1, 6, 7, 8,9, 10)])
 
 geo_shell$PR_GEN_VGEXCL <- predict(
-   gh_glm0, type = "response", newdata = geo_shell, allow.new.levels = TRUE)
+   glm, type = "response", newdata = geo_shell, allow.new.levels = TRUE)
 
-
+summary(geo_shell$PR_GEN_VGEXCL)
 #plot state results against predicted values
+
+ggplot(geo_shell, aes(x=STATE, y=PR_GEN_VGEXCL)) +
+    geom_point(shape=1)
+
 xyplot(geo_shell$PR_GEN_VGEXCL ~ geo_shell$ST_GEN_VGEXCL)
 #bwplot by state
 
