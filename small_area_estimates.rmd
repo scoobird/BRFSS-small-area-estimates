@@ -4,7 +4,7 @@ subtitle    :
 author      : Morgan Robinson 
 job         : Data Analyst, PolicyMap
 logo        : 
-output      : html_document # {word_document}
+output      : html_document 
 framework   : io2012        # {io2012, html5slides, shower, dzslides, ...}
 highlighter : highlight.js  # {highlight.js, prettify, highlight}
 hitheme     : tomorrow      # 
@@ -48,30 +48,44 @@ SQL connection reads the following data tables:
 * State-level survey data, weighted with provided values
 * Shell for prediction: a matrix of population of state/metro status/race/age/income classifications, based on 2009 - 2013 ACS and 2009 metropolitan classification (principal city/outlying county/rural)
 
-```{r demo2013, cache=TRUE}
+
+We take a robust sample of the survey data - due to memory/processing constraints, a full analysis is not possible. 40k records represents roughly 750 records per state, and should cover a meaningful number of the 640 combinations of race/age/income/metro status across all states. 
+
+Survey weights are used in this sample to avoid bias.
+
+```{r demo2013, cache=TRUE, echo=FALSE}
 # rm(con)
 # rm(data)
 # rm(statedata)
 # rm(geo_shell)
 # 
-# con <- odbcDriverConnect('driver={SQL Server};server=gis;database=CDC_BRFSS_PolicyMap;trusted_connection=true')
+# con <- odbcDriverConnect('driver=SQL Server Native Client 11.0;server=gis;database=CDC_BRFSS_PolicyMap;trusted_connection=Yes')
 # geo_shell <- sqlQuery(
 #   con, paste('SELECT * FROM dbo.geo_shell') , errors = TRUE) 
 # 
 # data <- sqlQuery(con, paste('select * from dbo.indicators_2013_cats_for_mrp'), errors = TRUE, max = 0)
 # 
 # statedata <- sqlQuery(con, paste('select * from dbo.inds_by_state_2013'), errors = TRUE)
+# statedata$FIPS <- formatC(statedata$FIPS, width=2, flag="0")
+# write.table(cbind(statedata, deparse.level = 1),
+#                   "statedata.txt",quote=TRUE,sep=",",col.names=TRUE,row.names=FALSE, na = "", append=FALSE)
+# 
+# geo_shell$FIPS <- factor(formatC(geo_shell$FIPS, width=2, flag="0"))
+# geo_shell <- geo_shell[geo_shell$FIPS %in% c('42', '10', '24', '34'), ]
+# 
+# write.table(cbind(geo_shell, deparse.level = 1),
+#                   "geo_shell.txt",quote=TRUE,sep=",",col.names=TRUE,row.names=FALSE, na = "", append=FALSE) #output table
 # 
 # data$FIPS <- factor(formatC(data$FIPS, width=2, flag="0"))
-# statedata$FIPS <- formatC(statedata$FIPS, width=2, flag="0")
-# geo_shell$FIPS <- factor(formatC(geo_shell$FIPS, width=2, flag="0"))
-# 
 # gh_rdata <- data[sample(1:nrow(data), size=5000, replace=F, prob = as.integer(data$LLCPWT)), ]
+# write.table(cbind(gh_rdata, deparse.level = 1),
+#                   "gh_rdata.txt",quote=TRUE,sep=",",col.names=TRUE,row.names=FALSE, na = "", append=FALSE) #output table
+
 
 data <- read.table("gh_rdata.txt", header=TRUE, quote="\"", sep=",", dec = ".", stringsAsFactors=T) #saved input table
+statedata <- read.table("statedata.txt", header=TRUE, quote="\"", sep=",", dec = ".", stringsAsFactors=T)
+geo_shell <- read.table("geo_shell.txt", header=TRUE, quote="\"", sep=",", dec = ".", stringsAsFactors=T)
 
-
-#geo_shell <- make .txt for some states
 
 ```
 
@@ -83,17 +97,16 @@ frequency
 ```{r matrix by state}
 #statedata <- # make .txt
 
-stcols <- c("MSCODE", "AVG_AGE_G", "AVG_INCOME_SCALE",  "AVG_HISPANC2", "AVG_WHITE", "AVG_BLACK", "AVG_OTHER",  "AVG_MULTI", "AVG_GENHLTH", "AVG_GEN_VGEXCL", "AVG_GEN_FRPOOR")
+stcols <- c("AVG_GEN_VGEXCL", "MSCODE", "AVG_AGE_G", "AVG_INCOME_SCALE",  "AVG_BLACK", "STATE")
 gh_statedata <-  statedata[,names(statedata) %in% stcols]
-
-statecormat <- cor(gh_statedata, y = NULL, use = "everything")
-corrplot(statecormat, details = TRUE, abs = TRUE)
-
+pairs(gh_statedata[, c(6, 2, 5, 7)])
 
 ```
 
 ##Merge the record-level survey with the state values
-In this section we tag the record-level survey with the state indicators. This borrows strength from the weighted state data. We use the state FIPS code to join the data and create new fields in the record-level dataset.
+Tag the record-level survey with the state indicators. 
+This allows us to use the weighted state values as predictor variables. 
+We use the state FIPS code to join the data and create new fields in the record-level dataset.
 ``` {r datamerge, tidy=TRUE}
 
 data$ST_MSSTATUS <- statedata$MSCODE[data$FIPS]# wt. average metro code among tracts in state
@@ -111,9 +124,7 @@ data$ST_GEN_FRPOOR <- statedata$AVG_GEN_FRPOOR[data$FIPS]
 ```
 
 ##Prep the survey data for modeling
-We take a robust sample of the survey data - due to memory/processing constraints, a full analysis is not possible. 40k records represents roughly 750 records per state, and should cover a meaningful number of the 640 combinations of race/age/income/metro status across all states. 
 
-Survey weights are used in this sample to avoid bias.
 
 ##Isolate predicted and predictor variables
 Select the response variable to predict, and all possible predictors. Use complete.cases to exclude all NA values from the sample.
