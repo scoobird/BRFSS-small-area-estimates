@@ -1,9 +1,0 @@
-base
-knitr
-RODBC
-ggplot2
-MASS
-Matrix
-Rcpp
-lme4
-arm
