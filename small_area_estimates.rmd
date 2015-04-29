@@ -159,6 +159,14 @@ Use a generalized linear model to identify variables for modeling
 
 # ggplot(gh_rdata, aes(x=GENHLTH, y=AGE_G | RACELABEL + INCOMELABEL, size=population)
 
+ggplot(data, aes(x=ST_GEN_VGEXCL, y=GEN_VGEXCL, color=(INCOMELABEL), xmin=0.4, xmax=0.6)) + geom_point(position=position_jitter( width=0.01, height=0.1), alpha = 0.5, shape=21, size=2)
+
+ggplot(data, aes(x=ST_GEN_VGEXCL, y=GEN_VGEXCL, xmin=-0.25, xmax=1.25))+
+  stat_smooth(method = "glm", family=binomial, fullrange=TRUE)
+
+ggplot(data, aes(x=ST_GEN_VGEXCL, y=GEN_VGEXCL, color=(AGE_GLABEL), xmin=-0.25, xmax=1.25)) + geom_point(position=position_jitter( width=0.01, height=0.1), alpha = 0.2, shape=21, size=1.5)+
+  stat_smooth(method = "glm", family=binomial, fullrange=TRUE, se=FALSE)
+
 glm <- glmer(GEN_VGEXCL ~  RACELABEL + INCOMELABEL + AGE_GLABEL + ST_GEN_VGEXCL + (1| MSLABEL:RACELABEL), family = "binomial", data = data)
 
 predictsample <- data[sample(1:nrow(data), size=5000, replace=T, prob = as.integer(data$LLCPWT)), ]
@@ -170,7 +178,7 @@ summary(predictsample$GEN_VGEXCL)
 summary(predictsample$ST_GEN_VGEXCL)
 
 #xyplot(PR_GEN_VGEXCL1~ AGE_GLABEL | STATE, data = predictsample)
-ggplot(predictsample, aes(x=INCOMELABEL, y=PR_GEN_VGEXCL1)) +
+ggplot(predictsample, aes(x=INCOMELABEL, y=PR_GEN_VGEXCL)) +
     geom_point(shape=1)
 
 ```
@@ -182,6 +190,12 @@ summary(geo_shell)
 
 
 ``` {r predict gen. hlth excellent small areas, echo=FALSE}
+
+
+states <- as.matrix(cbind(c(10, 24, 34, 42), c('DE', 'MD', 'NJ', 'PA')))
+states <- data.frame(states)
+colnames(states) <- cbind('FIPS', 'STATE')
+                          
 geo_shell$MSLABEL <- formatC(geo_shell$MSCODE, width = "1")
 geo_shell$MSLABEL[geo_shell$MSLABEL == "1"] <- "RA"
 geo_shell$MSLABEL[geo_shell$MSLABEL == "2"] <- "SC"
@@ -209,7 +223,7 @@ geo_shell$INCOME[geo_shell$INCOME == "6"] <- "I6"
 geo_shell$INCOME[geo_shell$INCOME == "7"] <- "I7"
 geo_shell$INCOME[geo_shell$INCOME == "8"] <- "I8"
 geo_shell$INCOMELABEL <- factor(geo_shell$INCOME)
-geo_shell$STATE <- statedata$STATE[geo_shell$FIPS]
+geo_shell$STATE <- states$STATE[geo_shell$FIPS]
 
 
 ```
@@ -222,15 +236,12 @@ head(geo_shell[, c(1, 6, 7, 8,9, 10)])
 geo_shell$PR_GEN_VGEXCL <- predict(
    glm, type = "response", newdata = geo_shell, allow.new.levels = TRUE)
 
-summary(geo_shell$PR_GEN_VGEXCL)
 #plot state results against predicted values
 
-ggplot(geo_shell, aes(x=STATE, y=PR_GEN_VGEXCL)) +
-    geom_point(shape=1)
+ggplot(geo_shell, aes(x=STATE, y=PR_GEN_VGEXCL))+
+    geom_boxplot(aes(group=STATE))
 
-xyplot(geo_shell$PR_GEN_VGEXCL ~ geo_shell$ST_GEN_VGEXCL)
-#bwplot by state
-
+summary(geo_shell$PR_GEN_VGEXCL)
 head(geo_shell)
 
 
