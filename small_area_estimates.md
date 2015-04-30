@@ -4,12 +4,12 @@ subtitle    :
 author      : Morgan Robinson 
 job         : Data Analyst, PolicyMap
 logo        : 
-output      : html_document 
+output      : pdf_document 
 framework   : io2012        # {io2012, html5slides, shower, dzslides, ...}
 highlighter : highlight.js  # {highlight.js, prettify, highlight}
 hitheme     : tomorrow      # 
 widgets     : [mathjax]            # {mathjax, quiz, bootstrap}
-mode        : draft # {standalone, selfcontained}
+mode        : standalone # {draft, selfcontained}
 ---
   
 
@@ -295,12 +295,27 @@ head(geo_shell[, c(1, 6, 7, 8,9, 10)])
 
 ```
 ##   FIPS MSLABEL AGE_GLABEL RACELABEL INCOMELABEL STATE
-## 1   34      SC         A3       RBK          I3    NJ
-## 2   24      SC         A3       RBK          I3    MD
-## 3   42      SC         A3       RBK          I3    PA
-## 4   10      SC         A3       RBK          I3    DE
-## 5   34      SC         A2       RMT          I3    NJ
-## 6   24      SC         A2       RMT          I3    MD
+## 1   34      CC         A3       RBK          I3    NJ
+## 2   24      CC         A3       RBK          I3    MD
+## 3   42      CC         A3       RBK          I3    PA
+## 4   10      CC         A3       RBK          I3    DE
+## 5   34      CC         A2       RMT          I3    NJ
+## 6   24      CC         A2       RMT          I3    MD
+```
+
+```r
+summary(geo_shell[, c(6, 7, 8, 9, 10)])
+```
+
+```
+##  MSLABEL  AGE_GLABEL RACELABEL  INCOMELABEL  STATE   
+##  CC:640   A1:640     RBK:512   I1     :320   DE:640  
+##  IC:640   A2:640     RHS:512   I2     :320   MD:640  
+##  RA:640   A3:640     RMT:512   I3     :320   NJ:640  
+##  SC:640   A4:640     ROT:512   I4     :320   PA:640  
+##                      RWH:512   I5     :320           
+##                                I6     :320           
+##                                (Other):640
 ```
 
 ```r
@@ -330,12 +345,12 @@ head(geo_shell)
 
 ```
 ##   FIPS MSCODE RACE AGE INCOME MSLABEL AGE_GLABEL RACELABEL INCOMELABEL
-## 1   34      2  RBK  A3     I3      SC         A3       RBK          I3
-## 2   24      2  RBK  A3     I3      SC         A3       RBK          I3
-## 3   42      2  RBK  A3     I3      SC         A3       RBK          I3
-## 4   10      2  RBK  A3     I3      SC         A3       RBK          I3
-## 5   34      2  RMT  A2     I3      SC         A2       RMT          I3
-## 6   24      2  RMT  A2     I3      SC         A2       RMT          I3
+## 1   34      2  RBK  A3     I3      CC         A3       RBK          I3
+## 2   24      2  RBK  A3     I3      CC         A3       RBK          I3
+## 3   42      2  RBK  A3     I3      CC         A3       RBK          I3
+## 4   10      2  RBK  A3     I3      CC         A3       RBK          I3
+## 5   34      2  RMT  A2     I3      CC         A2       RMT          I3
+## 6   24      2  RMT  A2     I3      CC         A2       RMT          I3
 ##   STATE ST_GEN_VGEXCL PR_GEN_VGEXCL
 ## 1    NJ     0.5280175     0.2970425
 ## 2    MD     0.5368445     0.3027684

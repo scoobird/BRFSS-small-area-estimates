@@ -4,12 +4,12 @@ subtitle    :
 author      : Morgan Robinson 
 job         : Data Analyst, PolicyMap
 logo        : 
-output      : html_document 
+output      : pdf_document 
 framework   : io2012        # {io2012, html5slides, shower, dzslides, ...}
 highlighter : highlight.js  # {highlight.js, prettify, highlight}
 hitheme     : tomorrow      # 
 widgets     : [mathjax]            # {mathjax, quiz, bootstrap}
-mode        : draft # {standalone, selfcontained}
+mode        : standalone # {draft, selfcontained}
 ---
   
 
@@ -197,10 +197,10 @@ states <- data.frame(states)
 colnames(states) <- cbind('FIPS', 'STATE')
                           
 geo_shell$MSLABEL <- formatC(geo_shell$MSCODE, width = "1")
-geo_shell$MSLABEL[geo_shell$MSLABEL == "1"] <- "RA"
-geo_shell$MSLABEL[geo_shell$MSLABEL == "2"] <- "SC"
-geo_shell$MSLABEL[geo_shell$MSLABEL == "3"] <- "CC"
-geo_shell$MSLABEL[geo_shell$MSLABEL == "4"] <- "IC"
+geo_shell$MSLABEL[geo_shell$MSLABEL == "1"] <- "IC"
+geo_shell$MSLABEL[geo_shell$MSLABEL == "2"] <- "CC"
+geo_shell$MSLABEL[geo_shell$MSLABEL == "3"] <- "SC"
+geo_shell$MSLABEL[geo_shell$MSLABEL == "4"] <- "RA"
 
 geo_shell$FIPS <- factor(geo_shell$FIPS)
 
@@ -232,6 +232,7 @@ geo_shell$STATE <- states$STATE[geo_shell$FIPS]
 geo_shell$ST_GEN_VGEXCL <- statedata$AVG_GEN_VGEXCL[geo_shell$FIPS]
 
 head(geo_shell[, c(1, 6, 7, 8,9, 10)])
+summary(geo_shell[, c(6, 7, 8, 9, 10)])
 
 geo_shell$PR_GEN_VGEXCL <- predict(
    glm, type = "response", newdata = geo_shell, allow.new.levels = TRUE)
