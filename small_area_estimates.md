@@ -13,7 +13,7 @@ mode        : standalone # {draft, selfcontained}
 ---
   
 
-This document contains the methodology and R code necessary to process the small area estimates for Health Status in 2013. 
+This document contains the methodology and R code necessary to process the small area estimates for Health Status in 2013.  
 
 Would you say that in general your health is: 
   * Excellent, Very good: GEN_VGEXCL
@@ -50,7 +50,7 @@ Survey weights are used in this sample to avoid bias.
 
 
 ## Analyze the data
-*How are our predictor variables related, at the state level?
+* How are our predictor variables related, at the state level?
 
 
 ```r
@@ -63,9 +63,9 @@ pairs(gh_statedata)
 
 ![plot of chunk matrix by state](figure/matrix by state-1.png) 
 
-*Tag the record-level survey with the state indicators. 
-*This allows us to use the weighted state values as predictor variables. 
-*We use the state FIPS code to join the data and create new fields in the record-level dataset.
+* Tag the record-level survey with the state indicators. 
+* This allows us to use the weighted state values as predictor variables. 
+* We use the state FIPS code to join the data and create new fields in the record-level dataset.
 
 ```r
 data$FIPS <- factor(data$FIPS)
@@ -86,10 +86,10 @@ statedata$FIPS <- factor(statedata$FIPS)
 ```
 
 ## Prep the survey data for modeling
-*Isolate predicted and predictor variables.
-*Select the response variable to predict, and all possible predictors. Make sure all predictor variables are properly coded as factors.
-*Relevel factors so the most prevalent category is the base.
-*Use complete.cases to exclude all NA values from the sample.
+* Isolate predicted and predictor variables.
+* Select the response variable to predict, and all possible predictors. Make sure all predictor variables are properly coded as factors.
+* Relevel factors so the most prevalent category is the base.
+* Use complete.cases to exclude all NA values from the sample.
 
 ```r
 ghcols <- c("FIPS", "STATE", "LLCPWT", "MSLABEL", "INCOMELABEL", "AGE_GLABEL", "RACELABEL", "GEN_VGEXCL", "ST_GEN_VGEXCL")
@@ -172,9 +172,9 @@ levels(data$RACELABEL)
 ```
 
 ## Exploratory modeling
-*Identify relationships among variables for modeling
-*Use a generalized binomial model with state fixed effects, individual fixed effects, and individual random effects. 
-*Validate this model with a separate sample of the original data.
+* Identify relationships among variables for modeling
+* Use a generalized binomial model with state fixed effects, individual fixed effects, and individual random effects. 
+* Validate this model with a separate sample of the original data.
 
 
 
@@ -212,7 +212,7 @@ summary(predictsample$PR_GEN_VGEXCL)
 
 ```
 ##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-##  0.1245  0.3746  0.5320  0.5027  0.6241  0.7984
+##  0.1245  0.3684  0.5254  0.4988  0.6171  0.7958
 ```
 
 ```r
@@ -221,7 +221,7 @@ summary(predictsample$GEN_VGEXCL)
 
 ```
 ##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-##  0.0000  0.0000  0.0000  0.4776  1.0000  1.0000
+##  0.0000  0.0000  0.0000  0.4792  1.0000  1.0000
 ```
 
 ```r
@@ -230,7 +230,7 @@ summary(predictsample$ST_GEN_VGEXCL)
 
 ```
 ##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-##  0.4265  0.4957  0.5072  0.4999  0.5159  0.6066
+##  0.4156  0.4949  0.5072  0.4994  0.5159  0.6172
 ```
 
 ```r
@@ -280,9 +280,9 @@ summary(geo_shell)
 
 
 ## Predicting the cells
-*Add the state values to our shell; we need the exact same variables in the shell in order to predict.
-*Use predict() to get the probability of a "Yes"
-*Plot predicted results by predictor variables and states.
+* Add the state values to our shell; we need the exact same variables in the shell in order to predict.
+* Use predict() to get the probability of a "Yes"
+* Plot predicted results by predictor variables and states.
 
 ```r
 geo_shell$ST_GEN_VGEXCL <- statedata$AVG_GEN_VGEXCL[geo_shell$FIPS]

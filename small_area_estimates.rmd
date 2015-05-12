@@ -13,7 +13,7 @@ mode        : standalone # {draft, selfcontained}
 ---
   
 
-This document contains the methodology and R code necessary to process the small area estimates for Health Status in 2013. 
+This document contains the methodology and R code necessary to process the small area estimates for Health Status in 2013.  
 
 Would you say that in general your health is: 
   * Excellent, Very good: GEN_VGEXCL
@@ -84,7 +84,7 @@ geo_shell <- read.table("geo_shell.txt", header=TRUE, quote="\"", sep=",", dec =
 ```
 
 ## Analyze the data
-*How are our predictor variables related, at the state level?
+* How are our predictor variables related, at the state level?
 
 ```{r matrix by state}
 #statedata <- # make .txt
@@ -95,9 +95,9 @@ pairs(gh_statedata)
 
 ```
 
-*Tag the record-level survey with the state indicators. 
-*This allows us to use the weighted state values as predictor variables. 
-*We use the state FIPS code to join the data and create new fields in the record-level dataset.
+* Tag the record-level survey with the state indicators. 
+* This allows us to use the weighted state values as predictor variables. 
+* We use the state FIPS code to join the data and create new fields in the record-level dataset.
 ``` {r datamerge, tidy=TRUE}
 
 data$FIPS <- factor(data$FIPS)
@@ -118,10 +118,10 @@ statedata$FIPS <- factor(statedata$FIPS)
 ```
 
 ## Prep the survey data for modeling
-*Isolate predicted and predictor variables.
-*Select the response variable to predict, and all possible predictors. Make sure all predictor variables are properly coded as factors.
-*Relevel factors so the most prevalent category is the base.
-*Use complete.cases to exclude all NA values from the sample.
+* Isolate predicted and predictor variables.
+* Select the response variable to predict, and all possible predictors. Make sure all predictor variables are properly coded as factors.
+* Relevel factors so the most prevalent category is the base.
+* Use complete.cases to exclude all NA values from the sample.
 ``` {r variable selection}
 ghcols <- c("FIPS", "STATE", "LLCPWT", "MSLABEL", "INCOMELABEL", "AGE_GLABEL", "RACELABEL", "GEN_VGEXCL", "ST_GEN_VGEXCL")
 data <-  data[,names(data) %in% ghcols]
@@ -140,9 +140,9 @@ levels(data$RACELABEL)
 ```
 
 ## Exploratory modeling
-*Identify relationships among variables for modeling
-*Use a generalized binomial model with state fixed effects, individual fixed effects, and individual random effects. 
-*Validate this model with a separate sample of the original data.
+* Identify relationships among variables for modeling
+* Use a generalized binomial model with state fixed effects, individual fixed effects, and individual random effects. 
+* Validate this model with a separate sample of the original data.
 
 
 ``` {r linear model, cache=TRUE}
@@ -222,9 +222,9 @@ geo_shell$STATE <- states$STATE[geo_shell$FIPS]
 ```
 
 ## Predicting the cells
-*Add the state values to our shell; we need the exact same variables in the shell in order to predict.
-*Use predict() to get the probability of a "Yes"
-*Plot predicted results by predictor variables and states.
+* Add the state values to our shell; we need the exact same variables in the shell in order to predict.
+* Use predict() to get the probability of a "Yes"
+* Plot predicted results by predictor variables and states.
 ```{r predict gen. hlth excellent small areas}
 geo_shell$ST_GEN_VGEXCL <- statedata$AVG_GEN_VGEXCL[geo_shell$FIPS]
 
