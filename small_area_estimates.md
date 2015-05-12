@@ -27,12 +27,6 @@ library("ggplot2")
 library("arm")
 ```
 
-to do: load data, sample, then export to csv; 
-save csv in github assets; 
-comment out and remove actual paths.
-
-
-
 1. BRFSS data structure
   a. predictor and response variables
 2. ACS data structure
@@ -55,10 +49,8 @@ Survey weights are used in this sample to avoid bias.
 
 
 
-##Analyze the state and record level data
-Good visualizations for this:
-frequency
-
+## Analyze the data
+*How are our predictor variables related, at the state level?
 
 
 ```r
@@ -71,10 +63,9 @@ pairs(gh_statedata)
 
 ![plot of chunk matrix by state](figure/matrix by state-1.png) 
 
-##Merge the record-level survey with the state values
-Tag the record-level survey with the state indicators. 
-This allows us to use the weighted state values as predictor variables. 
-We use the state FIPS code to join the data and create new fields in the record-level dataset.
+*Tag the record-level survey with the state indicators. 
+*This allows us to use the weighted state values as predictor variables. 
+*We use the state FIPS code to join the data and create new fields in the record-level dataset.
 
 ```r
 data$FIPS <- factor(data$FIPS)
@@ -94,11 +85,11 @@ data$ST_GEN_FRPOOR <- statedata$AVG_GEN_FRPOOR[data$FIPS]
 statedata$FIPS <- factor(statedata$FIPS)
 ```
 
-##Prep the survey data for modeling
-
-
-##Isolate predicted and predictor variables
-Select the response variable to predict, and all possible predictors. Use complete.cases to exclude all NA values from the sample.
+## Prep the survey data for modeling
+*Isolate predicted and predictor variables.
+*Select the response variable to predict, and all possible predictors. Make sure all predictor variables are properly coded as factors.
+*Relevel factors so the most prevalent category is the base.
+*Use complete.cases to exclude all NA values from the sample.
 
 ```r
 ghcols <- c("FIPS", "STATE", "LLCPWT", "MSLABEL", "INCOMELABEL", "AGE_GLABEL", "RACELABEL", "GEN_VGEXCL", "ST_GEN_VGEXCL")
@@ -180,10 +171,10 @@ levels(data$RACELABEL)
 ## [1] "RWH" "RBK" "RHS" "RMT" "ROT"
 ```
 
-##Exploratory modeling
-Use a generalized linear model to identify variables for modeling
-
-
+## Exploratory modeling
+*Identify relationships among variables for modeling
+*Use a generalized binomial model with state fixed effects, individual fixed effects, and individual random effects. 
+*Validate this model with a separate sample of the original data.
 
 
 
@@ -250,6 +241,8 @@ ggplot(predictsample, aes(x=INCOMELABEL, y=PR_GEN_VGEXCL)) +
 
 ![plot of chunk linear model](figure/linear model-4.png) 
 
+## Cells for prediction
+Shell for prediction contains one record for each combination of age, income, race, metro status, and state. (33,920 records)
 
 ```r
 geo_shell[0:10, ]
@@ -286,6 +279,10 @@ summary(geo_shell)
 
 
 
+## Predicting the cells
+*Add the state values to our shell; we need the exact same variables in the shell in order to predict.
+*Use predict() to get the probability of a "Yes"
+*Plot predicted results by predictor variables and states.
 
 ```r
 geo_shell$ST_GEN_VGEXCL <- statedata$AVG_GEN_VGEXCL[geo_shell$FIPS]
@@ -328,7 +325,7 @@ ggplot(geo_shell, aes(x=STATE, y=PR_GEN_VGEXCL))+
     geom_boxplot(aes(group=STATE))
 ```
 
-![plot of chunk unnamed-chunk-1](figure/unnamed-chunk-1-1.png) 
+![plot of chunk predict gen. hlth excellent small areas](figure/predict gen. hlth excellent small areas-1.png) 
 
 ```r
 summary(geo_shell$PR_GEN_VGEXCL)
@@ -340,28 +337,24 @@ summary(geo_shell$PR_GEN_VGEXCL)
 ```
 
 ```r
-head(geo_shell)
+head(geo_shell[, c(1, 6, 7, 8,9, 10, 11, 12)])
 ```
 
 ```
-##   FIPS MSCODE RACE AGE INCOME MSLABEL AGE_GLABEL RACELABEL INCOMELABEL
-## 1   34      2  RBK  A3     I3      CC         A3       RBK          I3
-## 2   24      2  RBK  A3     I3      CC         A3       RBK          I3
-## 3   42      2  RBK  A3     I3      CC         A3       RBK          I3
-## 4   10      2  RBK  A3     I3      CC         A3       RBK          I3
-## 5   34      2  RMT  A2     I3      CC         A2       RMT          I3
-## 6   24      2  RMT  A2     I3      CC         A2       RMT          I3
-##   STATE ST_GEN_VGEXCL PR_GEN_VGEXCL
-## 1    NJ     0.5280175     0.2970425
-## 2    MD     0.5368445     0.3027684
-## 3    PA     0.4265109     0.2359465
-## 4    DE     0.4444476     0.2460825
-## 5    NJ     0.5280175     0.2822745
-## 6    MD     0.5368445     0.2878322
+##   FIPS MSLABEL AGE_GLABEL RACELABEL INCOMELABEL STATE ST_GEN_VGEXCL
+## 1   34      CC         A3       RBK          I3    NJ     0.5280175
+## 2   24      CC         A3       RBK          I3    MD     0.5368445
+## 3   42      CC         A3       RBK          I3    PA     0.4265109
+## 4   10      CC         A3       RBK          I3    DE     0.4444476
+## 5   34      CC         A2       RMT          I3    NJ     0.5280175
+## 6   24      CC         A2       RMT          I3    MD     0.5368445
+##   PR_GEN_VGEXCL
+## 1     0.2970425
+## 2     0.3027684
+## 3     0.2359465
+## 4     0.2460825
+## 5     0.2822745
+## 6     0.2878322
 ```
 
 
-
-```r
-## county map with ggplot2
-```

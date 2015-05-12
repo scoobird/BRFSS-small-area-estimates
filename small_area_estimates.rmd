@@ -27,12 +27,6 @@ library("arm")
 
 ```
 
-to do: load data, sample, then export to csv; 
-save csv in github assets; 
-comment out and remove actual paths.
-
-
-
 1. BRFSS data structure
   a. predictor and response variables
 2. ACS data structure
@@ -89,10 +83,8 @@ geo_shell <- read.table("geo_shell.txt", header=TRUE, quote="\"", sep=",", dec =
 
 ```
 
-##Analyze the state and record level data
-Good visualizations for this:
-frequency
-
+## Analyze the data
+*How are our predictor variables related, at the state level?
 
 ```{r matrix by state}
 #statedata <- # make .txt
@@ -103,10 +95,9 @@ pairs(gh_statedata)
 
 ```
 
-##Merge the record-level survey with the state values
-Tag the record-level survey with the state indicators. 
-This allows us to use the weighted state values as predictor variables. 
-We use the state FIPS code to join the data and create new fields in the record-level dataset.
+*Tag the record-level survey with the state indicators. 
+*This allows us to use the weighted state values as predictor variables. 
+*We use the state FIPS code to join the data and create new fields in the record-level dataset.
 ``` {r datamerge, tidy=TRUE}
 
 data$FIPS <- factor(data$FIPS)
@@ -126,11 +117,11 @@ data$ST_GEN_FRPOOR <- statedata$AVG_GEN_FRPOOR[data$FIPS]
 statedata$FIPS <- factor(statedata$FIPS)
 ```
 
-##Prep the survey data for modeling
-
-
-##Isolate predicted and predictor variables
-Select the response variable to predict, and all possible predictors. Use complete.cases to exclude all NA values from the sample.
+## Prep the survey data for modeling
+*Isolate predicted and predictor variables.
+*Select the response variable to predict, and all possible predictors. Make sure all predictor variables are properly coded as factors.
+*Relevel factors so the most prevalent category is the base.
+*Use complete.cases to exclude all NA values from the sample.
 ``` {r variable selection}
 ghcols <- c("FIPS", "STATE", "LLCPWT", "MSLABEL", "INCOMELABEL", "AGE_GLABEL", "RACELABEL", "GEN_VGEXCL", "ST_GEN_VGEXCL")
 data <-  data[,names(data) %in% ghcols]
@@ -148,11 +139,10 @@ levels(data$INCOMELABEL)
 levels(data$RACELABEL)
 ```
 
-##Exploratory modeling
-Use a generalized linear model to identify variables for modeling
-
-```{r glm, eval=FALSE}
-```
+## Exploratory modeling
+*Identify relationships among variables for modeling
+*Use a generalized binomial model with state fixed effects, individual fixed effects, and individual random effects. 
+*Validate this model with a separate sample of the original data.
 
 
 ``` {r linear model, cache=TRUE}
@@ -183,13 +173,15 @@ ggplot(predictsample, aes(x=INCOMELABEL, y=PR_GEN_VGEXCL)) +
 
 ```
 
+## Cells for prediction
+Shell for prediction contains one record for each combination of age, income, race, metro status, and state. (33,920 records)
 ```{r prediction}
 geo_shell[0:10, ]
 summary(geo_shell)
 ```
 
 
-``` {r predict gen. hlth excellent small areas, echo=FALSE}
+``` {r format, echo=FALSE}
 
 
 states <- as.matrix(cbind(c(10, 24, 34, 42), c('DE', 'MD', 'NJ', 'PA')))
@@ -197,6 +189,7 @@ states <- data.frame(states)
 colnames(states) <- cbind('FIPS', 'STATE')
                           
 geo_shell$MSLABEL <- formatC(geo_shell$MSCODE, width = "1")
+# Confusing: we coded the shell variables in a contrary manner; you may want to do this differently.
 geo_shell$MSLABEL[geo_shell$MSLABEL == "1"] <- "IC"
 geo_shell$MSLABEL[geo_shell$MSLABEL == "2"] <- "CC"
 geo_shell$MSLABEL[geo_shell$MSLABEL == "3"] <- "SC"
@@ -228,7 +221,11 @@ geo_shell$STATE <- states$STATE[geo_shell$FIPS]
 
 ```
 
-```{r}
+## Predicting the cells
+*Add the state values to our shell; we need the exact same variables in the shell in order to predict.
+*Use predict() to get the probability of a "Yes"
+*Plot predicted results by predictor variables and states.
+```{r predict gen. hlth excellent small areas}
 geo_shell$ST_GEN_VGEXCL <- statedata$AVG_GEN_VGEXCL[geo_shell$FIPS]
 
 head(geo_shell[, c(1, 6, 7, 8,9, 10)])
@@ -243,14 +240,9 @@ ggplot(geo_shell, aes(x=STATE, y=PR_GEN_VGEXCL))+
     geom_boxplot(aes(group=STATE))
 
 summary(geo_shell$PR_GEN_VGEXCL)
-head(geo_shell)
+head(geo_shell[, c(1, 6, 7, 8,9, 10, 11, 12)])
 
 
 ```
 
 
-``` {r map}
-
-## county map with ggplot2
-
-```
